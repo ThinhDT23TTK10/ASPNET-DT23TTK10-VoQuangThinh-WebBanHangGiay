@@ -1,0 +1,163 @@
+﻿@model IEnumerable<BanHangThoiTrangMVC.Models.ShoppingCartItem>
+@using BanHangThoiTrangMVC.Common
+
+<table class="table" id="cartTable">
+    <tr class="text-left">
+        <th class="text-center">STT</th>
+        <th>Ảnh</th>
+        <th>Tên sản phẩm</th>
+        <th>Danh mục</th>
+        <th>Giá</th>
+        <th style="width:100px;">Số lượng</th>
+        <th>Thành tiền</th>
+        <th style="width:50px;"></th>
+    </tr>
+
+    @{
+        var i = 0;
+        var tongtien = decimal.Zero;
+    }
+    @if (Model != null && Model.Any())
+    {
+        foreach (var item in Model)
+        {
+            tongtien += item.TotalPrice;
+            <tr class="text-left cart-row" id="trow_@item.ProductId" data-id="@item.ProductId" data-price="@item.Price">
+                <td class="text-center">@(++i)</td>
+                <td><img src="@item.ProductImg" width="60" /></td>
+                <td class="text-left">
+                    <a href="/chi-tiet/@item.Alias-p@(item.ProductId)">@item.ProductName</a>
+                </td>
+                <td>@item.CategoryName</td>
+
+                <td class="cell-price" data-raw="@item.Price">@Common.FormatNumber(item.Price, 0)</td>
+
+                <td>
+                    <input type="number"
+                           class="form-control quantity-input text-center border-0 blue"
+                           id="Quantity_@item.ProductId"
+                           data-id="@item.ProductId"
+                           value="@item.Quantity"
+                           min="1"/>
+                </td>
+
+                <td class="cell-total" data-raw="@item.TotalPrice">@Common.FormatNumber(item.TotalPrice, 0)</td>
+
+                <td>
+                    <a href="#" data-id="@item.ProductId" class="btn btn-sm btn-danger btnDelete">X</a>
+                    @*<a href="#" data-id="@item.ProductId" class="btn btn-sm btn-success btnUpdate">Cập nhật</a>*@
+                </td>
+            </tr>
+        }
+        <tr id="rowGrandTotal">
+            <th colspan="6" class="text-right">Tổng: </th>
+            <th class="text-center" id="grandTotal" data-raw="@tongtien">@Common.FormatNumber(tongtien, 0)</th>
+            <th></th>
+        </tr>
+    }
+    else
+    {
+        <tr>
+            <th colspan="7">Không có sản phẩm trong giỏ hàng!!</th>
+        </tr>
+    }
+</table>
+<script>
+    function debounce(fn, delay) {
+        let t;
+        return function (...args) {
+            clearTimeout(t);
+            t = setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+
+    function fmt(n) {
+        if (n == null) return "0";
+        return Number(n).toLocaleString('vi-VN');
+    }
+
+    function recomputeGrandTotal() {
+        let sum = 0;
+        $("#cartTable .cell-total").each(function () {
+            const raw = parseFloat($(this).attr("data-raw")) || 0;
+            sum += raw;
+        });
+        $("#grandTotal").attr("data-raw", sum).text(fmt(sum));
+    }
+
+    function updateRowTotal($row, qty) {
+        const price = parseFloat($row.data("price")) || 0;
+        const line = price * qty;
+        const $cellTotal = $row.find(".cell-total");
+        $cellTotal.attr("data-raw", line).text(fmt(line));
+    }
+
+    function postUpdate(id, qty, onDone) {
+        $.ajax({
+            url: '/ShoppingCart/Update',
+            type: 'POST',
+            data: { id: id, quantity: qty },
+            success: function (rs) {
+                if (rs && rs.Success) {
+                    if (typeof onDone === "function") onDone(true);
+                } else {
+                    if (typeof onDone === "function") onDone(false, rs && rs.msg);
+                }
+            },
+            error: function () {
+                if (typeof onDone === "function") onDone(false, "Lỗi mạng");
+            }
+        });
+    }
+
+    $(document).ready(function () {
+        $(document).on('input change', '.quantity-input', debounce(function () {
+            const $inp = $(this);
+            const id = $inp.data("id");
+            let qty = parseInt($inp.val(), 10);
+
+            const min = parseInt($inp.attr("min") || "1", 10);
+            const max = parseInt($inp.attr("max") || "999999", 10);
+            if (isNaN(qty) || qty < min) qty = min;
+            if (qty > max) qty = max;
+            $inp.val(qty);
+
+            const $row = $("#trow_" + id);
+
+            updateRowTotal($row, qty);
+            recomputeGrandTotal();
+
+            postUpdate(id, qty, function (ok, msg) {
+                if (!ok) {
+                    alert(msg || "Cập nhật thất bại");
+                }
+            });
+        }, 350));
+
+        $(document).on('click', '.btnUpdate', function (e) {
+            e.preventDefault();
+            const id = $(this).data("id");
+            const $inp = $("#Quantity_" + id);
+            const qty = parseInt($inp.val(), 10) || 1;
+
+            const $row = $("#trow_" + id);
+            updateRowTotal($row, qty);
+            recomputeGrandTotal();
+
+            postUpdate(id, qty, function (ok, msg) {
+                if (!ok) alert(msg || "Cập nhật thất bại");
+            });
+        });
+
+        $(document).on('click', '.btnDelete', function (e) {
+            e.preventDefault();
+            const id = $(this).data("id");
+            $.post('/ShoppingCart/Delete', { id }, function (rs) {
+                if (rs && rs.Success) {
+                    $("#trow_" + id).remove();
+                    recomputeGrandTotal();
+                }
+            });
+        });
+    });
+</script>
