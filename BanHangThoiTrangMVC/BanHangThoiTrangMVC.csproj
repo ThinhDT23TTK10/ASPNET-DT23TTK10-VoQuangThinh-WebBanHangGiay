@@ -193,6 +193,8 @@
     <Compile Include="Areas\Admin\Controllers\RoleController.cs" />
     <Compile Include="Areas\Admin\Controllers\SettingSystemController.cs" />
     <Compile Include="Areas\Admin\Controllers\StatisticalController.cs" />
+    <Compile Include="Common\Common.cs" />
+    <Compile Include="Common\SettingHelper.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
